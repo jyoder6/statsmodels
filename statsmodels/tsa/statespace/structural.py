@@ -1410,10 +1410,10 @@ class UnobservedComponentsResults(MLEResults):
                               ' of the state vector.', OutputWarning)
             else:
                 offset = int(spec.trend + spec.level
-                         + self._k_states_by_type['seasonal']
-                         + self._k_states_by_type['freq_seasonal']
-                         + spec.cycle * (1 + spec.stochastic_cycle)
-                         + spec.ar_order)
+                             + self._k_states_by_type['seasonal']
+                             + self._k_states_by_type['freq_seasonal']
+                             + self._k_states_by_type['cycle']
+                             + spec.ar_order)
                 start = offset
                 end = offset + spec.k_exog
                 out = Bunch(
