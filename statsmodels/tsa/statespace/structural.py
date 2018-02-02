@@ -10,7 +10,6 @@ from warnings import warn
 from statsmodels.compat.collections import OrderedDict
 
 import numpy as np
-import pandas as pd
 from statsmodels.tsa.filters.hp_filter import hpfilter
 from statsmodels.tsa.tsatools import lagmat
 from .mlemodel import MLEModel, MLEResults, MLEResultsWrapper
@@ -301,9 +300,10 @@ class UnobservedComponents(MLEModel):
     """
 
     def __init__(self, endog, level=False, trend=False, seasonal=None,
-                 freq_seasonal=None,
-                 cycle=False, autoregressive=None, exog=None, irregular=False,
-                 stochastic_level=False, stochastic_trend=False,
+                 freq_seasonal=None, cycle=False, autoregressive=None,
+                 exog=None, irregular=False,
+                 stochastic_level=False,
+                 stochastic_trend=False,
                  stochastic_seasonal=True,
                  stochastic_freq_seasonal=None,
                  stochastic_cycle=False,
@@ -334,7 +334,6 @@ class UnobservedComponents(MLEModel):
         self.stochastic_level = stochastic_level
         self.stochastic_trend = stochastic_trend
         self.stochastic_seasonal = stochastic_seasonal
-
         if stochastic_freq_seasonal is None:
             self.stochastic_freq_seasonal = [True] * len(
                 self.freq_seasonal_periods)
@@ -345,7 +344,6 @@ class UnobservedComponents(MLEModel):
                     " of freq_seasonal: {!r} vs {!r}".format(
                         len(stochastic_freq_seasonal), len(freq_seasonal)))
             self.stochastic_freq_seasonal = stochastic_freq_seasonal
-
         self.stochastic_cycle = stochastic_cycle
 
         self.damped_cycle = damped_cycle
@@ -397,7 +395,7 @@ class UnobservedComponents(MLEModel):
                 self.trend = True
                 self.trend_specification = 'deterministic trend'
             elif (spec == 'local linear deterministic trend' or
-                          spec == 'lldtrend'):
+                    spec == 'lldtrend'):
                 self.irregular = True
                 self.level = True
                 self.stochastic_level = True
@@ -438,13 +436,13 @@ class UnobservedComponents(MLEModel):
             self.stochastic_level = False
 
         if not (self.irregular or
-                    (self.level and self.stochastic_level) or
-                    (self.trend and self.stochastic_trend) or
-                    (self.seasonal and self.stochastic_seasonal) or
-                    (self.freq_seasonal and any(
-                        self.stochastic_freq_seasonal)) or
-                    (self.cycle and self.stochastic_cycle) or
-                    self.autoregressive):
+                (self.level and self.stochastic_level) or
+                (self.trend and self.stochastic_trend) or
+                (self.seasonal and self.stochastic_seasonal) or
+                (self.freq_seasonal and any(
+                    self.stochastic_freq_seasonal)) or
+                (self.cycle and self.stochastic_cycle) or
+                self.autoregressive):
             warn("Specified model does not contain a stochastic element;"
                  " irregular component added.", SpecificationWarning)
             self.irregular = True
@@ -540,26 +538,23 @@ class UnobservedComponents(MLEModel):
             if freq == 'A':
                 cycle_period_bounds = (1.5, 12)
             elif freq == 'Q':
-                cycle_period_bounds = (1.5 * 4, 12 * 4)
+                cycle_period_bounds = (1.5*4, 12*4)
             elif freq == 'M':
-                cycle_period_bounds = (1.5 * 12, 12 * 12)
+                cycle_period_bounds = (1.5*12, 12*12)
             else:
                 # If we have no information on data frequency, require the
                 # cycle frequency to be between 0 and pi
                 cycle_period_bounds = (2, np.inf)
 
         self.cycle_frequency_bound = (
-            2 * np.pi / cycle_period_bounds[1],
-            2 * np.pi / cycle_period_bounds[0]
+            2*np.pi / cycle_period_bounds[1], 2*np.pi / cycle_period_bounds[0]
         )
 
         # update _init_keys attached by super
         self._init_keys += ['level', 'trend', 'seasonal', 'freq_seasonal',
-                            'cycle',
-                            'autoregressive', 'exog', 'irregular',
+                            'cycle', 'autoregressive', 'exog', 'irregular',
                             'stochastic_level', 'stochastic_trend',
-                            'stochastic_seasonal',
-                            'freq_seasonal',
+                            'stochastic_seasonal', 'stochastic_freq_seasonal',
                             'stochastic_cycle',
                             'damped_cycle', 'cycle_period_bounds',
                             'mle_regression'] + list(kwargs.keys())
@@ -571,10 +566,10 @@ class UnobservedComponents(MLEModel):
 
         # Modifications
         kwds['seasonal'] = self.seasonal_periods
-        kwds['freq_seasonal'] = [{
-            'period': p,
-            'harmonics': self.freq_seasonal_harmonics[ix]} for ix, p in
-            enumerate(self.freq_seasonal_periods)]
+        kwds['freq_seasonal'] = [
+            {'period': p,
+             'harmonics': self.freq_seasonal_harmonics[ix]} for
+            ix, p in enumerate(self.freq_seasonal_periods)]
         kwds['autoregressive'] = self.ar_order
 
         for key, value in kwds.items():
@@ -604,7 +599,7 @@ class UnobservedComponents(MLEModel):
             self.ssm['design', 0, i] = 1.
             self.ssm['transition', i, i] = 1.
             if self.trend:
-                self.ssm['transition', i, i + 1] = 1.
+                self.ssm['transition', i, i+1] = 1.
             if self.stochastic_level:
                 self.ssm['selection', i, j] = 1.
                 self.parameters_state_cov['level_var'] = 1
@@ -666,21 +661,21 @@ class UnobservedComponents(MLEModel):
             if self.damped_cycle:
                 self.parameters_transition['cycle_damp'] = 1
             if self.stochastic_cycle:
-                self.ssm['selection', i:i + 2, j:j + 2] = np.eye(2)
+                self.ssm['selection', i:i+2, j:j+2] = np.eye(2)
                 self.parameters_state_cov['cycle_var'] = 1
                 j += 2
-            self._idx_cycle_transition = np.s_['transition', i:i + 2, i:i + 2]
+            self._idx_cycle_transition = np.s_['transition', i:i+2, i:i+2]
             i += 2
         if self.autoregressive:
             self.ssm['design', 0, i] = 1.
             self.parameters_transition['ar_coeff'] = self.ar_order
             self.parameters_state_cov['ar_var'] = 1
             self.ssm['selection', i, j] = 1
-            self.ssm['transition', i:i + self.ar_order, i:i + self.ar_order] = (
+            self.ssm['transition', i:i+self.ar_order, i:i+self.ar_order] = (
                 companion_matrix(self.ar_order).T
             )
             self._idx_ar_transition = (
-                np.s_['transition', i, i:i + self.ar_order]
+                np.s_['transition', i, i:i+self.ar_order]
             )
             j += 1
             i += self.ar_order
@@ -691,9 +686,9 @@ class UnobservedComponents(MLEModel):
                 design = np.repeat(self.ssm['design', :, :, 0], self.nobs,
                                    axis=0)
                 self.ssm['design'] = design.transpose()[np.newaxis, :, :]
-                self.ssm['design', 0, i:i + self.k_exog, :] = (
+                self.ssm['design', 0, i:i+self.k_exog, :] = (
                     self.exog.transpose())
-                self.ssm['transition', i:i + self.k_exog, i:i + self.k_exog] = (
+                self.ssm['transition', i:i+self.k_exog, i:i+self.k_exog] = (
                     np.eye(self.k_exog)
                 )
 
@@ -744,9 +739,9 @@ class UnobservedComponents(MLEModel):
 
             start = (
                 self.level + self.trend +
-                (self.seasonal_periods - 1) * self.seasonal +
+                self._k_seasonal_states +
                 self._k_freq_seas_states +
-                self.cycle * 2
+                self._k_cycle_states
             )
             end = start + self.ar_order
             selection_stationary = self.ssm['selection', start:end, :, 0]
@@ -799,11 +794,11 @@ class UnobservedComponents(MLEModel):
 
             if self.stochastic_trend:
                 cycle2, trend2 = hpfilter(trend1)
-                _start_params['trend_var'] = np.std(trend2) ** 2
+                _start_params['trend_var'] = np.std(trend2)**2
                 if self.stochastic_level:
-                    _start_params['level_var'] = np.std(cycle2) ** 2
+                    _start_params['level_var'] = np.std(cycle2)**2
             elif self.stochastic_level:
-                _start_params['level_var'] = np.std(trend1) ** 2
+                _start_params['level_var'] = np.std(trend1)**2
         else:
             resid = self.ssm.endog[0]
 
@@ -892,6 +887,7 @@ class UnobservedComponents(MLEModel):
             elif key == 'seasonal_var':
                 param_names.append('sigma2.seasonal')
             elif key.startswith('freq_seasonal_var_'):
+                # There are potentially multiple frequency domain seasonal terms
                 idx_fseas_comp = int(key[-1])
                 periodicity = self.freq_seasonal_periods[idx_fseas_comp]
                 harmonics = self.freq_seasonal_harmonics[idx_fseas_comp]
@@ -908,7 +904,7 @@ class UnobservedComponents(MLEModel):
                 param_names.append('damping.cycle')
             elif key == 'ar_coeff':
                 for i in range(self.ar_order):
-                    param_names.append('ar.L%d' % (i + 1))
+                    param_names.append('ar.L%d' % (i+1))
             elif key == 'ar_var':
                 param_names.append('sigma2.ar')
             elif key == 'reg_coeff':
@@ -930,15 +926,15 @@ class UnobservedComponents(MLEModel):
 
         # Positive parameters: obs_cov, state_cov
         offset = self.k_obs_cov + self.k_state_cov
-        constrained[:offset] = unconstrained[:offset] ** 2
+        constrained[:offset] = unconstrained[:offset]**2
 
         # Cycle parameters
         if self.cycle:
             # Cycle frequency must be between between our bounds
             low, high = self.cycle_frequency_bound
             constrained[offset] = (
-                                      1 / (1 + np.exp(-unconstrained[offset]))
-                                  ) * (high - low) + low
+                1 / (1 + np.exp(-unconstrained[offset]))
+            ) * (high - low) + low
             offset += 1
 
             # Cycle damping (if present) must be between 0 and 1
@@ -973,7 +969,7 @@ class UnobservedComponents(MLEModel):
 
         # Positive parameters: obs_cov, state_cov
         offset = self.k_obs_cov + self.k_state_cov
-        unconstrained[:offset] = constrained[:offset] ** 0.5
+        unconstrained[:offset] = constrained[:offset]**0.5
 
         # Cycle parameters
         if self.cycle:
@@ -1020,7 +1016,7 @@ class UnobservedComponents(MLEModel):
 
         # State covariance
         if self.k_state_cov > 0:
-            variances = params[offset:offset + self.k_state_cov]
+            variances = params[offset:offset+self.k_state_cov]
             if self._repeat_any_var:
                 variances = np.repeat(variances, self._var_repetitions)
             self.ssm[self._idx_state_cov] = variances
@@ -1043,7 +1039,7 @@ class UnobservedComponents(MLEModel):
         # AR transition
         if self.autoregressive:
             self.ssm[self._idx_ar_transition] = (
-                params[offset:offset + self.ar_order]
+                params[offset:offset+self.ar_order]
             )
             offset += self.ar_order
 
@@ -1052,7 +1048,7 @@ class UnobservedComponents(MLEModel):
             if self.mle_regression:
                 self.ssm['obs_intercept'] = np.dot(
                     self.exog,
-                    params[offset:offset + self.k_exog]
+                    params[offset:offset+self.k_exog]
                 )[None, :]
             offset += self.k_exog
 
@@ -1354,8 +1350,9 @@ class UnobservedComponentsResults(MLEResults):
             - `offset`: an integer giving the offset in the state vector where
                         this component begins
         """
-        # If present, autoregressive always follows level/trend, seasonal, and
-        # cyclical. If it is an AR(p) model, then there are p associated
+        # If present, autoregressive always follows level/trend, seasonal,
+        # freq seasonal, and cyclical.
+        # If it is an AR(p) model, then there are p associated
         # states, but the second - pth states are just lags of the first state.
         out = None
         spec = self.specification
@@ -1396,7 +1393,7 @@ class UnobservedComponentsResults(MLEResults):
                         this component begins
         """
         # If present, state-vector regression coefficients always are last
-        # (i.e. they follow level/trend, seasonal, cyclical, and
+        # (i.e. they follow level/trend, seasonal, freq seasonal, cyclical, and
         # autoregressive states). There is one state associated with each
         # regressor, and all are returned here.
         out = None
@@ -1764,7 +1761,6 @@ class UnobservedComponentsResults(MLEResults):
             alpha=alpha, start=start, title='Unobserved Components Results',
             model_name=model_name
         )
-
     summary.__doc__ = MLEResults.summary.__doc__
 
 
@@ -1775,7 +1771,5 @@ class UnobservedComponentsResultsWrapper(MLEResultsWrapper):
     _methods = {}
     _wrap_methods = wrap.union_dicts(MLEResultsWrapper._wrap_methods,
                                      _methods)
-
-
 wrap.populate_wrapper(UnobservedComponentsResultsWrapper,
                       UnobservedComponentsResults)
