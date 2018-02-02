@@ -726,6 +726,9 @@ class UnobservedComponents(MLEModel):
             self._var_repetitions[cov_ix] = 2
         self._repeat_any_var = any(self._var_repetitions > 1)
 
+        # Initialize the state
+        self.initialize_state()
+
     def initialize_state(self):
         # Initialize the AR component as stationary, the rest as approximately
         # diffuse
@@ -1051,9 +1054,6 @@ class UnobservedComponents(MLEModel):
                     params[offset:offset+self.k_exog]
                 )[None, :]
             offset += self.k_exog
-
-        # Initialize the state
-        self.initialize_state()
 
 
 class UnobservedComponentsResults(MLEResults):
