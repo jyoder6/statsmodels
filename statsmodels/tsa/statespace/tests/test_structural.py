@@ -184,6 +184,10 @@ def test_seasonal():
     run_ucm('seasonal')
 
 
+def test_freq_seasonal():
+    run_ucm('freq_seasonal')
+
+
 def test_reg():
     run_ucm('reg')
 

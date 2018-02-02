@@ -169,6 +169,16 @@ seasonal = {
     'rtol': 1e-6
 }
 
+freq_seasonal = {
+    'models': [{'irregular': True,
+                'freq_seasonal': [{'period': 4, 'harmonics': 2},
+                                  {'period': 3, 'harmonics': 1}]}],
+    'params': [38.1704278, 0.1, .05],
+    'llf': -649.010216522,
+    'kwargs': {},
+    'rtol': 1e-6
+}
+
 reg = {
     # Note: The test needs to fill in exog=np.log(dta['realgdp'])
     'models': [
