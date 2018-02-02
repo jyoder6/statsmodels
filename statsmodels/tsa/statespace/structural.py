@@ -630,14 +630,20 @@ class UnobservedComponents(MLEModel):
                 n = 2 * h
                 # cf. D&K eqn (3.7) with alternating states
                 # $gamma_{jt}$ and $gamma^*_{jt}$ in state vector
-                self.ssm['design', 0, i:i + n] = np.repeat([1., 0.], h)
+                self.ssm['design', 0, i:i + n] = np.tile([1., 0.], h)
 
                 p = self.freq_seasonal_periods[ix]
                 lambda_p = 2 * np.pi / float(p)
-                t = 0 # frequency transition matrix offset
+
+                # This part of the transition matrix is the direct sum
+                # C1 \oplus C2 \oplus ... \oplus C_h, where
+                # C_j is [[cos(lambda_j), sin(lambda_j)],
+                #        [-sin(lambda_j), cos(lambda_j)]
+                # and lambda_j = lambda_p * j
+                t = 0  # frequency transition matrix offset
                 for block in range(1, h + 1):
-                    cos_lambda_block = np.cos(lambda_p*block)
-                    sin_lambda_block = np.sin(lambda_p*block)
+                    cos_lambda_block = np.cos(lambda_p * block)
+                    sin_lambda_block = np.sin(lambda_p * block)
                     trans = np.array([[cos_lambda_block, sin_lambda_block],
                                       [-sin_lambda_block, cos_lambda_block]])
                     trans_s = np.s_[i + t:i + t + 2]
@@ -708,8 +714,7 @@ class UnobservedComponents(MLEModel):
         # Some of the variances may be tied together (repeated parameter usage)
         self._var_repetitions = np.ones(self.k_state_cov, dtype=np.int)
         if self.freq_seasonal:
-            for ix, is_stochastic in enumerate(
-                    self.stochastic_freq_seasonal):
+            for ix, is_stochastic in enumerate(self.stochastic_freq_seasonal):
                 if is_stochastic:
                     num_harmonics = self.freq_seasonal_harmonics[ix]
                     repeat_times = 2 * num_harmonics
@@ -883,9 +888,14 @@ class UnobservedComponents(MLEModel):
             elif key == 'seasonal_var':
                 param_names.append('sigma2.seasonal')
             elif key.startswith('freq_seasonal_var_'):
-                idx_seasonal_component_ = key[-1]
+                idx_fseas_comp = int(key[-1])
+                periodicity = self.freq_seasonal_periods[idx_fseas_comp]
+                harmonics = self.freq_seasonal_harmonics[idx_fseas_comp]
+                freq_seasonal_name = "{p}({h})".format(
+                    p=repr(periodicity),
+                    h=repr(harmonics))
                 param_names.append(
-                    'sigma2.' + 'freq_seasonal_' + idx_seasonal_component_)
+                    'sigma2.' + 'freq_seasonal_' + freq_seasonal_name)
             elif key == 'cycle_var':
                 param_names.append('sigma2.cycle')
             elif key == 'cycle_freq':
@@ -1084,6 +1094,9 @@ class UnobservedComponentsResults(MLEResults):
             'trend': self.model.trend,
             'seasonal_periods': self.model.seasonal_periods,
             'seasonal': self.model.seasonal,
+            'freq_seasonal': self.model.freq_seasonal,
+            'freq_seasonal_periods': self.model.freq_seasonal_periods,
+            'freq_seasonal_harmonics': self.model.freq_seasonal_harmonics,
             'cycle': self.model.cycle,
             'ar_order': self.model.ar_order,
             'autoregressive': self.model.autoregressive,
@@ -1091,6 +1104,7 @@ class UnobservedComponentsResults(MLEResults):
             'stochastic_level': self.model.stochastic_level,
             'stochastic_trend': self.model.stochastic_trend,
             'stochastic_seasonal': self.model.stochastic_seasonal,
+            'stochastic_freq_seasonal': self.model.stochastic_freq_seasonal,
             'stochastic_cycle': self.model.stochastic_cycle,
 
             'damped_cycle': self.model.damped_cycle,
@@ -1628,6 +1642,18 @@ class UnobservedComponentsResults(MLEResults):
             if self.specification.stochastic_seasonal:
                 seasonal_name = 'stochastic ' + seasonal_name
             model_name.append(seasonal_name)
+
+        if self.specification.freq_seasonal:
+            for ix, is_stochastic in enumerate(
+                    self.specification.stochastic_freq_seasonal):
+                periodicity = self.specification.freq_seasonal_periods[ix]
+                harmonics = self.specification.freq_seasonal_harmonics[ix]
+                freq_seasonal_name = "freq_seasonal({p}({h}))".format(
+                    p=repr(periodicity),
+                    h=repr(harmonics))
+                if is_stochastic:
+                    freq_seasonal_name = 'stochastic ' + freq_seasonal_name
+                model_name.append(freq_seasonal_name)
 
         if self.specification.cycle:
             cycle_name = 'cycle'
