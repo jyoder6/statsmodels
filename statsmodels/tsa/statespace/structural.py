@@ -321,7 +321,8 @@ class UnobservedComponents(MLEModel):
         if freq_seasonal:
             self.freq_seasonal_periods = [d['period'] for d in freq_seasonal]
             self.freq_seasonal_harmonics = [d.get(
-                'harmonics', np.floor(d['period'] / 2)) for d in freq_seasonal]
+                'harmonics', int(np.floor(d['period'] / 2))) for
+                d in freq_seasonal]
         else:
             self.freq_seasonal_periods = []
             self.freq_seasonal_harmonics = []
@@ -505,8 +506,12 @@ class UnobservedComponents(MLEModel):
 
         # We can still estimate the model with just the irregular component,
         # just need to have one state that does nothing.
+        #  The ar states are redundant as are 1 state each for the frequency
+        # seasonal terms.
         loglikelihood_burn = kwargs.get('loglikelihood_burn',
-                                        k_states - self.ar_order)
+                                        k_states
+                                        - len(self.freq_seasonal_harmonics)
+                                        - self.ar_order)
         if k_states == 0:
             if not self.irregular:
                 raise ValueError('Model has no components specified.')
@@ -711,6 +716,8 @@ class UnobservedComponents(MLEModel):
         self._idx_state_cov = ('state_cov', idx[0], idx[1])
 
         # Some of the variances may be tied together (repeated parameter usage)
+        # Use list() for compatibility with python 3.5
+        param_keys = list(self.parameters_state_cov.keys())
         self._var_repetitions = np.ones(self.k_state_cov, dtype=np.int)
         if self.freq_seasonal:
             for ix, is_stochastic in enumerate(self.stochastic_freq_seasonal):
@@ -718,16 +725,13 @@ class UnobservedComponents(MLEModel):
                     num_harmonics = self.freq_seasonal_harmonics[ix]
                     repeat_times = 2 * num_harmonics
                     cov_key = 'freq_seasonal_var_{!r}'.format(ix)
-                    cov_ix = self.parameters_state_cov.keys().index(cov_key)
+                    cov_ix = param_keys.index(cov_key)
                     self._var_repetitions[cov_ix] = repeat_times
 
         if self.stochastic_cycle and self.cycle:
-            cov_ix = self.parameters_state_cov.keys().index('cycle_var')
+            cov_ix = param_keys.index('cycle_var')
             self._var_repetitions[cov_ix] = 2
         self._repeat_any_var = any(self._var_repetitions > 1)
-
-        # Initialize the state
-        self.initialize_state()
 
     def initialize_state(self):
         # Initialize the AR component as stationary, the rest as approximately
@@ -1054,6 +1058,10 @@ class UnobservedComponents(MLEModel):
                     params[offset:offset+self.k_exog]
                 )[None, :]
             offset += self.k_exog
+
+        # Initialize the state
+        self.initialize_state()
+
 
 
 class UnobservedComponentsResults(MLEResults):
