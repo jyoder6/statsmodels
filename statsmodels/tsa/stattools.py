@@ -22,6 +22,7 @@ __all__ = ['acovf', 'acf', 'pacf', 'pacf_yw', 'pacf_ols', 'ccovf', 'ccf',
            'periodogram', 'q_stat', 'coint', 'arma_order_select_ic',
            'adfuller', 'kpss', 'bds']
 
+SQRTEPS = np.sqrt(np.finfo(np.double).eps)
 
 #NOTE: now in two places to avoid circular import
 #TODO: I like the bunch pattern for this too.
@@ -932,6 +933,10 @@ def coint(y0, y1, trend='c', method='aeg', maxlag=None, autolag='aic',
     Constant or trend is included in 1st stage regression, i.e. in
     cointegrating equation.
 
+    **Warning:** The autolag default has changed compared to statsmodels 0.8.
+    In 0.8 autolag was always None, no the keyword is used and defaults to
+    'aic'. Use `autolag=None` to avoid the lag search.
+
     Parameters
     ----------
     y1 : array_like, 1d
@@ -951,6 +956,13 @@ def coint(y0, y1, trend='c', method='aeg', maxlag=None, autolag='aic',
         keyword for `adfuller`, largest or given number of lags
     autolag : string
         keyword for `adfuller`, lag selection criterion.
+        * if None, then maxlag lags are used without lag search
+        * if 'AIC' (default) or 'BIC', then the number of lags is chosen
+          to minimize the corresponding information criterion
+        * 't-stat' based choice of maxlag.  Starts with maxlag and drops a
+          lag until the t-statistic on the last lag length is significant
+          using a 5%-sized test
+
     return_results : bool
         for future compatibility, currently only tuple available.
         If True, then a results instance is returned. Otherwise, a tuple
@@ -978,6 +990,11 @@ def coint(y0, y1, trend='c', method='aeg', maxlag=None, autolag='aic',
 
     P-values and critical values are obtained through regression surface
     approximation from MacKinnon 1994 and 2010.
+
+    If the two series are almost perfectly collinear, then computing the
+    test is numerically unstable. However, the two series will be cointegrated
+    under the maintained assumption that they are integrated. In this case
+    the t-statistic will be set to -inf and the pvalue to zero.
 
     TODO: We could handle gaps in data by dropping rows with nans in the
     auxiliary regressions. Not implemented yet, currently assumes no nans
@@ -1010,15 +1027,15 @@ def coint(y0, y1, trend='c', method='aeg', maxlag=None, autolag='aic',
 
     res_co = OLS(y0, xx).fit()
 
-    if res_co.rsquared < 1 - np.sqrt(np.finfo(np.double).eps):
-        res_adf = adfuller(res_co.resid, maxlag=maxlag, autolag=None,
+    if res_co.rsquared < 1 - 100 * SQRTEPS:
+        res_adf = adfuller(res_co.resid, maxlag=maxlag, autolag=autolag,
                            regression='nc')
     else:
         import warnings
-        warnings.warn("y0 and y1 are perfectly colinear.  Cointegration test "
-                      "is not reliable in this case.")
+        warnings.warn("y0 and y1 are (almost) perfectly colinear."
+                      "Cointegration test is not reliable in this case.")
         # Edge case where series are too similar
-        res_adf = (0,)
+        res_adf = (-np.inf,)
 
     # no constant or trend, see egranger in Stata and MacKinnon
     if trend == 'nc':
